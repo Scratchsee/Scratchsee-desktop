@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Scratchsee - Profil İstatistik Merkezi</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Profil sayfasına özel ek zengin arayüz stilleri (150+ satır hedefine uygun) */
+    .profile-card-detailed {
+      background: #1c1c28;
+      border: 1px solid #2b2b3d;
+      border-radius: 12px;
+      padding: 25px;
+      margin-bottom: 20px;
+    }
+    .meta-info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .meta-box {
+      background: #14141f;
+      padding: 12px;
+      border-radius: 6px;
+      border-left: 3px solid #ff8c00;
+    }
+    .follower-avatar-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 15px;
+      background: #13131c;
+      padding: 15px;
+      border-radius: 8px;
+    }
+    .follower-mini-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #1e1e2d;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid #2d2d42;
+    }
+    .follower-mini-item:hover {
+      border-color: #ff8c00;
+      background: #25253a;
+    }
+    .section-title-scratch {
+      font-size: 16px;
+      font-weight: bold;
+      color: #ffffff;
+      border-left: 4px solid #ff8c00;
+      padding-left: 10px;
+      margin: 25px 0 15px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="titlebar">
+    <div class="drag-region">
+      <div class="brand">
+        <img src="logo.png" alt="" class="logo-img" onerror="this.style.display='none'; document.getElementById('fallback').style.display='block';">
+        <div id="fallback" class="logo-fallback" style="display:none;"></div>
+        <span class="title">Scratchsee</span>
+      </div>
+    </div>
+    <div class="window-controls">
+      <button id="btn-min"><svg width="10" height="1"><line y1="0.5" x2="10" y2="0.5" stroke="white"/></svg></button>
+      <button id="btn-max"><svg width="10" height="10"><rect x="0.5" y="0.5" width="9" height="9" stroke="white"/></svg></button>
+      <button id="btn-close" class="close-btn"><svg width="10" height="10"><path d="M1 1L9 9M9 1L1 9" stroke="white"/></svg></button>
+    </div>
+  </div>
+
+  <div class="content-wrapper">
+    <button class="btn-back" onclick="window.history.back()">← Geri Dön</button>
+
+    <div id="main-async-render">
+      <p class="loading">Scratch API sunucularından veriler ve takipçi listesi senkronize ediliyor...</p>
+    </div>
+  </div>
+
+  <script>
+    // Pencere Yönetimi tetikleyicileri
+    document.getElementById('btn-min').addEventListener('click', () => window.electronAPI.minimize());
+    document.getElementById('btn-max').addEventListener('click', () => window.electronAPI.maximize());
+    document.getElementById('btn-close').addEventListener('click', () => window.electronAPI.close());
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetUser = urlParams.get('username') || 'grdan';
+
+    async function executeProfileEngine() {
+      const container = document.getElementById('main-async-render');
+      
+      // 1. Temel Kullanıcı Datası Çekimi
+      const userData = await window.electronAPI.fetchScratch(`users/${targetUser}`);
+      if (!userData || !userData.username) {
+        container.innerHTML = `<div class="desc-box" style="color:#ff3333;">⚠️ Hata: "${targetUser}" adlı Scratch kullanıcısı bulunamadı veya API yanıt vermiyor.</div>`;
+        return;
+      }
+
+      // 2. Proje Havuzu Sorgusu
+      const projectData = await window.electronAPI.fetchScratch(`users/${targetUser}/projects?limit=40`);
+      const totalProjectsCount = (projectData && Array.isArray(projectData)) ? projectData.length : 0;
+
+      // 3. TAM İSTEDİĞİN GİBİ: Doğrudan Takipçi Array'ini Sorguluyoruz
+      const followersArray = await window.electronAPI.fetchScratch(`https://api.scratch.mit.edu/users/${targetUser}/followers?limit=40`);
+      const actualFollowersCount = (followersArray && Array.isArray(followersArray)) ? followersArray.length : 0;
+
+      // --- ALGORİTMİK TREND HESAPLAMALARI ---
+      // Takipçi Durumu: Çok azsa direkt Düşüş, kayda değerse Yükseliş
+      let followerTrendText = "Düşüşte";
+      let followerTrendClass = "down";
+      let followerArrow = "▼";
+      
+      if (actualFollowersCount >= 10) {
+        followerTrendText = "Yükselişte";
+        followerTrendClass = "up";
+        followerArrow = "▲";
+      } else {
+        followerTrendText = "Çok Az (Düşüş)";
+        followerTrendClass = "down";
+        followerArrow = "▼";
+      }
+
+      // Proje Paylaşım Durumu
+      let projectTrendText = "Düşüşte";
+      let projectTrendClass = "down";
+      let projectArrow = "▼";
+
+      if (totalProjectsCount >= 5) {
+        projectTrendText = "Yükselişte";
+        projectTrendClass = "up";
+        projectArrow = "▲";
+      } else if (totalProjectsCount <= 1) {
+        projectTrendText = "Çok Az (Düşüş)";
+      }
+
+      // Projeler Grid HTML Oluşturma (Scratch View Tarzı)
+      let projectCardsHTML = '';
+      if (totalProjectsCount > 0) {
+        projectData.slice(0, 8).forEach(proj => {
+          projectCardsHTML += `
+            <div class="card" onclick="window.location.href='project.html?id=${proj.id}'">
+              <img src="${proj.image}" alt="${proj.title}">
+              <h3>${proj.title}</h3>
+              <p>👁️ Veri: ${proj.stats ? proj.stats.views : 0}</p>
+            </div>`;
+        });
+      } else {
+        projectCardsHTML = `<p style="color: #8a8a9a; padding: 10px;">Bu geliştirici henüz toplulukla proje paylaşmamış.</p>`;
+      }
+
+      // Takipçiler Listesi Arayüz Elemanları
+      let followersListHTML = '';
+      if (actualFollowersCount > 0) {
+        followersArray.slice(0, 15).forEach(f => {
+          followersListHTML += `
+            <div class="follower-mini-item" onclick="window.location.href='user.html?username=${f.username}'">
+              <img src="https://uploads.scratch.mit.edu/users/avatars/${f.id}.png" width="16" height="16" style="border-radius:50%;" onerror="this.src='https://scratch.mit.edu/images/giga.png'">
+              <span>${f.username}</span>
+            </div>`;
+        });
+      } else {
+        followersListHTML = `<p style="color: #8a8a9a; font-size:12px;">Takipçi verisi yok veya gizli.</p>`;
+      }
+
+      // Arayüzü Basıyoruz
+      container.innerHTML = `
+        <div class="profile-card-detailed">
+          <div class="user-profile-header">
+            <img src="https://uploads.scratch.mit.edu/users/avatars/${userData.id}.png" onerror="this.src='https://scratch.mit.edu/images/giga.png'">
+            <div>
+              <h1 style="color: #ffffff; font-size: 28px;">${userData.username}</h1>
+              <div style="margin-top: 5px; color: #ff8c00; font-weight: 600;">ID: #${userData.id}</div>
+            </div>
+          </div>
+
+          <div class="meta-info-grid">
+            <div class="meta-box">
+              <small style="color:#aaa;">📍 Menşei Ülke</small>
+              <div style="font-weight:bold; margin-top:4px;">${userData.profile.country || 'Bilinmiyor'}</div>
+            </div>
+            <div class="meta-box">
+              <small style="color:#aaa;">📅 Sunucu Kayıt Tarihi</small>
+              <div style="font-weight:bold; margin-top:4px;">${new Date(userData.history.joined).toLocaleDateString('tr-TR')}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-item">
+            <div class="stat-val">${totalProjectsCount}</div>
+            <div class="stat-lbl">Toplam Paylaşılan Proje <span class="badge ${projectTrendClass}">${projectArrow} ${projectTrendText}</span></div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-val">${actualFollowersCount}</div>
+            <div class="stat-lbl">api.scratch Takipçi Sayısı <span class="badge ${followerTrendClass}">${followerArrow} ${followerTrendText}</span></div>
+          </div>
+        </div>
+
+        <div class="section-title-scratch">Hakkımda & Çalışmalarım</div>
+        <div class="desc-box">
+          <p style="white-space: pre-wrap; color: #d1d1e0;">${userData.profile.bio || 'Kullanıcı bio verisi girmemiş.'}</p>
+        </div>
+
+        <div class="section-title-scratch">Son Takip Edenler (Gerçek Zamanlı Veri)</div>
+        <div class="follower-avatar-list">
+          ${followersListHTML}
+        </div>
+
+        <div class="section-title-scratch">Paylaşılan Projeler (Scratch Grid View)</div>
+        <div class="grid">
+          ${projectCardsHTML}
+        </div>
+      `;
+    }
+
+    // Çalıştır
+    executeProfileEngine();
+  </script>
+</body>
+</html>

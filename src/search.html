@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Scratchsee - Arama</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="titlebar">
+    <div class="drag-region">
+      <div class="brand">
+        <img src="logo.png" alt="" class="logo-img" onerror="this.style.display='none'; document.getElementById('fallback').style.display='block';">
+        <div id="fallback" class="logo-fallback" style="display:none;"></div>
+        <span class="title">Scratchsee</span>
+      </div>
+    </div>
+    <div class="window-controls">
+      <button id="btn-min"><svg width="10" height="1"><line y1="0.5" x2="10" y2="0.5" stroke="white"/></svg></button>
+      <button id="btn-max"><svg width="10" height="10"><rect x="0.5" y="0.5" width="9" height="9" stroke="white"/></svg></button>
+      <button id="btn-close" class="close-btn"><svg width="10" height="10"><path d="M1 1L9 9M9 1L1 9" stroke="white"/></svg></button>
+    </div>
+  </div>
+
+  <div class="content-wrapper">
+    <button class="btn-back" onclick="window.location.href='index.html'">← Ana Sayfaya Dön</button>
+    <h1 id="search-title" style="margin-bottom:20px;">Arama yapılıyor...</h1>
+
+    <div class="search-columns">
+      <div class="column">
+        <h2>Projeler</h2>
+        <div id="project-results"><p class="loading">Aranıyor...</p></div>
+      </div>
+      <div class="column">
+        <h2>Kullanıcılar</h2>
+        <div id="user-results"><p class="loading">Aranıyor...</p></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('btn-min').addEventListener('click', () => window.electronAPI.minimize());
+    document.getElementById('btn-max').addEventListener('click', () => window.electronAPI.maximize());
+    document.getElementById('btn-close').addEventListener('click', () => window.electronAPI.close());
+
+    const params = new URLSearchParams(window.location.search);
+    const query = params.get('q');
+
+    async function search() {
+      if(!query) return;
+      document.getElementById('search-title').innerText = `"${query}" İçin Sonuçlar`;
+
+      const projects = await window.electronAPI.fetchScratch(`search/projects?q=${encodeURIComponent(query)}&limit=8`);
+      const pDiv = document.getElementById('project-results');
+      pDiv.innerHTML = '';
+      if(projects && projects.length > 0) {
+        projects.forEach(p => {
+          pDiv.innerHTML += `
+            <div class="list-item" onclick="window.location.href='project.html?id=${p.id}'">
+              <div>
+                <strong style="color: #ff8c00;">${p.title}</strong><br>
+                <small style="color:#aaa">Geliştirici: ${p.author.username}</small>
+              </div>
+            </div>`;
+        });
+      } else { pDiv.innerHTML = '<p>Proje bulunamadı.</p>'; }
+
+      const user = await window.electronAPI.fetchScratch(`users/${encodeURIComponent(query)}`);
+      const uDiv = document.getElementById('user-results');
+      uDiv.innerHTML = '';
+      if(user && user.username) {
+        uDiv.innerHTML = `
+          <div class="list-item" onclick="window.location.href='user.html?username=${user.username}'">
+            <img src="https://uploads.scratch.mit.edu/users/avatars/${user.id}.png" onerror="this.src='https://scratch.mit.edu/images/giga.png'">
+            <div><strong>${user.username}</strong><br><small style="color:#aaa">Profili Gör</small></div>
+          </div>`;
+      } else { uDiv.innerHTML = '<p>Kullanıcı bulunamadı.</p>'; }
+    }
+    search();
+  </script>
+</body>
+</html>

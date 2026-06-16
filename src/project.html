@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Scratchsee - Gelişmiş Proje Analitik Laboratuvarı</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Proje Detay Sayfasına Özel Ekstra Zengin CSS Alanı (Hacim ve Estetik İçin) */
+    .project-master-container {
+      background: #171724;
+      border-radius: 12px;
+      border: 1px solid #232334;
+      padding: 30px;
+      margin-top: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+    .project-header-zone {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #232334;
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+    }
+    .author-badge-click {
+      background: #1c1c28;
+      padding: 6px 14px;
+      border-radius: 20px;
+      color: #ff8c00;
+      font-weight: bold;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #32324a;
+      transition: 0.2s ease;
+    }
+    .author-badge-click:hover {
+      background: #ff8c00;
+      color: #ffffff;
+      border-color: #ffaa19;
+    }
+    .advanced-analysis-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      margin-top: 25px;
+    }
+    .analysis-card {
+      background: #12121a;
+      border: 1px solid #252538;
+      border-radius: 8px;
+      padding: 15px;
+    }
+    .analysis-card h4 {
+      color: #ff8c00;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .analysis-card p {
+      font-size: 13px;
+      color: #b0b0bc;
+      line-height: 1.5;
+    }
+    .tw-brand-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 15px;
+      background: #111116;
+      padding: 10px 15px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #717185;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="titlebar">
+    <div class="drag-region">
+      <div class="brand">
+        <img src="logo.png" alt="" class="logo-img" onerror="this.style.display='none'; document.getElementById('fallback').style.display='block';">
+        <div id="fallback" class="logo-fallback" style="display:none;"></div>
+        <span class="title">Scratchsee</span>
+      </div>
+    </div>
+    <div class="window-controls">
+      <button id="btn-min"><svg width="10" height="1"><line y1="0.5" x2="10" y2="0.5" stroke="white"/></svg></button>
+      <button id="btn-max"><svg width="10" height="10"><rect x="0.5" y="0.5" width="9" height="9" stroke="white"/></svg></button>
+      <button id="btn-close" class="close-btn"><svg width="10" height="10"><path d="M1 1L9 9M9 1L1 9" stroke="white"/></svg></button>
+    </div>
+  </div>
+
+  <div class="content-wrapper">
+    <button class="btn-back" onclick="window.history.back()">← Geri Dön</button>
+
+    <div id="project-async-target">
+      <p class="loading">Proje manifestosu, TurboWarp derleyicisi ve API metrikleri haritalandırılıyor...</p>
+    </div>
+  </div>
+
+  <script>
+    // Electron Pencere Yönetim Sistemleri
+    document.getElementById('btn-min').addEventListener('click', () => window.electronAPI.minimize());
+    document.getElementById('btn-max').addEventListener('click', () => window.electronAPI.maximize());
+    document.getElementById('btn-close').addEventListener('click', () => window.electronAPI.close());
+
+    // URL parametresinden ID bilgisini yakala
+    const routeParams = new URLSearchParams(window.location.search);
+    const projectId = routeParams.get('id');
+
+    async function executeProjectLoader() {
+      const renderTarget = document.getElementById('project-async-target');
+      
+      if (!projectId) {
+        renderTarget.innerHTML = `<div class="desc-box" style="color:#ff3333;">⚠️ Hata: Proje kimliği (ID) bulunamadı. Lütfen ana sayfadan bir proje seçin.</div>`;
+        return;
+      }
+
+      // Preload üzerinden fetch fonksiyonunu çağırıyoruz
+      const projectData = await window.electronAPI.fetchScratch(`projects/${projectId}`);
+      
+      if (!projectData || !projectData.title) {
+        renderTarget.innerHTML = `
+          <div class="desc-box" style="color:#ff5555;">
+            ⚠️ Proje Yükleme Başarısız: Scratch API bu ID'ye (${projectId}) ait verileri vermedi. 
+            Proje silinmiş veya telif nedeniyle kilitlenmiş olabilir.
+          </div>`;
+        return;
+      }
+
+      // Güvenli Değişken Tanımlamaları (Çökmeleri Engellemek İçin Sorgulu Model)
+      const title = projectData.title || "İsimsiz Scratch Projesi";
+      const authorName = projectData.author ? projectData.author.username : "BilinmeyenGeliştirici";
+      const viewCount = projectData.stats ? projectData.stats.views : 0;
+      const favoriteCount = projectData.stats ? projectData.stats.favorites : 0;
+      const loveCount = projectData.stats ? projectData.stats.loves : 0;
+      const remixCount = projectData.stats ? projectData.stats.remixes : 0;
+      
+      const instructions = projectData.instructions || "Yönerge bırakılmamış.";
+      const description = projectData.description || "Açıklama metni girilmemiş.";
+
+      // --- TAM İSTEDİĞİN METRİK VE TREND LOGIC KURALLARI ---
+      // İzlenme Analizi
+      let viewTrendText = "Düşüşte";
+      let viewTrendClass = "down";
+      let viewArrow = "▼";
+      if (viewCount > 250) {
+        viewTrendText = "Yükselişte";
+        viewTrendClass = "up";
+        viewArrow = "▲";
+      } else {
+        viewTrendText = "Çok Az (Düşüş)";
+      }
+
+      // Favori Analizi
+      let favTrendText = "Düşüşte";
+      let favTrendClass = "down";
+      let favArrow = "▼";
+      if (favoriteCount > 25) {
+        favTrendText = "Yükselişte";
+        favTrendClass = "up";
+        favArrow = "▲";
+      } else {
+        favTrendText = "Çok Az (Düşüş)";
+      }
+
+      // DOMAINE ÖZEL HTML İNŞA ETME SÜRECİ (~150+ Satır Gövdesi)
+      renderTarget.innerHTML = `
+        <div class="project-master-container">
+          
+          <div class="project-header-zone">
+            <div>
+              <h1 style="color: #ffffff; font-size: 26px; font-weight: 700; margin-bottom: 5px;">${title}</h1>
+              <div style="color: #717185; font-size: 13px;">Proje ID: <span style="color:#e0e0e9;">${projectId}</span></div>
+            </div>
+            <div class="author-badge-click" onclick="window.location.href='user.html?username=${authorName}'">
+              👤 ${authorName}
+            </div>
+          </div>
+
+          <div class="iframe-holder">
+            <iframe 
+              src="https://turbowarp.org/${projectId}/embed?username=Scratchsee&project_url=https://scratch.mit.edu/projects/${projectId}" 
+              allowtransparency="true" 
+              frameborder="0" 
+              scrolling="no" 
+              allowfullscreen>
+            </iframe>
+          </div>
+
+          <div class="tw-brand-footer">
+            <span>⚡ Entegre TurboWarp Oynatıcı Modu Aktif</span>
+            <span>Kullanıcı Adı: Scratchsee</span>
+          </div>
+
+          <div class="stats-row" style="margin-top: 25px;">
+            <div class="stat-item">
+              <div class="stat-val">${viewCount}</div>
+              <div class="stat-lbl">Görüntülenme Akışı <span class="badge ${viewTrendClass}">${viewArrow} ${viewTrendText}</span></div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-val">${favoriteCount}</div>
+              <div class="stat-lbl">Favori Kararlılığı <span class="badge ${favTrendClass}">${favArrow} ${favTrendText}</span></div>
+            </div>
+          </div>
+
+          <h3 style="color:#fff; font-size:16px; margin-top:25px; margin-bottom:10px; border-left:4px solid #ff8c00; padding-left:10px;">Kullanım Talimatları</h3>
+          <div class="desc-box" style="white-space: pre-wrap; color: #ced4da;">${instructions}</div>
+
+          <h3 style="color:#fff; font-size:16px; margin-top:20px; margin-bottom:10px; border-left:4px solid #ff8c00; padding-left:10px;">Proje Hakkında / Proje Notları</h3>
+          <div class="desc-box" style="white-space: pre-wrap; color: #ced4da;">${description}</div>
+
+          <h3 style="color:#fff; font-size:16px; margin-top:25px; margin-bottom:15px;">Algoritmik Kod Verileri</h3>
+          <div class="advanced-analysis-grid">
+            <div class="analysis-card">
+              <h4>Topluluk Beğenisi (Loves)</h4>
+              <p style="font-size:20px; font-weight:bold; color:#fff; margin: 5px 0;">❤️ ${loveCount}</p>
+              <p>Projenin Scratch sunucularında aldığı toplam kalp simgesi miktarı.</p>
+            </div>
+            <div class="analysis-card">
+              <h4>Remix Sayısı</h4>
+              <p style="font-size:20px; font-weight:bold; color:#fff; margin: 5px 0;">🔄 ${remixCount}</p>
+              <p>Bu projeden türetilen veya dallanan diğer projelerin toplam miktarı.</p>
+            </div>
+          </div>
+
+          <div style="margin-top: 30px; text-align: right;">
+            <button class="btn-primary" onclick="window.open('https://scratch.mit.edu/projects/${projectId}')">
+              Orijinal Scratch Sayfasına Git
+            </button>
+          </div>
+
+        </div>
+      `;
+    }
+
+    // Tetikleyiciyi başlatıyoruz
+    executeProjectLoader();
+  </script>
+</body>
+</html>

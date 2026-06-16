@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Scratchsee - Ana Sayfa</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="titlebar">
+    <div class="drag-region">
+      <div class="brand">
+        <img src="logo.png" alt="" class="logo-img" onerror="this.style.display='none'; document.getElementById('fallback').style.display='block';">
+        <div id="fallback" class="logo-fallback" style="display:none;"></div>
+        <span class="title">Scratchsee</span>
+      </div>
+    </div>
+    <div class="window-controls">
+      <button id="btn-min"><svg width="10" height="1"><line y1="0.5" x2="10" y2="0.5" stroke="white"/></svg></button>
+      <button id="btn-max"><svg width="10" height="10"><rect x="0.5" y="0.5" width="9" height="9" stroke="white"/></svg></button>
+      <button id="btn-close" class="close-btn"><svg width="10" height="10"><path d="M1 1L9 9M9 1L1 9" stroke="white"/></svg></button>
+    </div>
+  </div>
+
+  <div class="content-wrapper">
+    <div class="search-container">
+      <h1>Ne aratmak istersiniz?</h1>
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Örn: yemek yeme simulasyonu">
+        <button id="search-btn">Ara</button>
+      </div>
+    </div>
+
+    <h2>En Favori Projeler</h2>
+    <div class="grid" id="featured-grid">
+      <p class="loading">Projeler yükleniyor...</p>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('btn-min').addEventListener('click', () => window.electronAPI.minimize());
+    document.getElementById('btn-max').addEventListener('click', () => window.electronAPI.maximize());
+    document.getElementById('btn-close').addEventListener('click', () => window.electronAPI.close());
+
+    function doSearch() {
+      const q = document.getElementById('search-input').value.trim();
+      if(q) window.location.href = `search.html?q=${encodeURIComponent(q)}`;
+    }
+    document.getElementById('search-btn').addEventListener('click', doSearch);
+    document.getElementById('search-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') doSearch(); });
+
+    async function init() {
+      const res = await window.electronAPI.fetchScratch('explore/projects?limit=8&mode=trending');
+      const grid = document.getElementById('featured-grid');
+      grid.innerHTML = '';
+      if(res) {
+        res.forEach(p => {
+          grid.innerHTML += `
+            <div class="card" onclick="window.location.href='project.html?id=${p.id}'">
+              <img src="${p.image}">
+              <h3>${p.title}</h3>
+              <p>👤 ${p.author.username}</p>
+            </div>`;
+        });
+      } else { grid.innerHTML = '<p>Veri yüklenemedi.</p>'; }
+    }
+    init();
+  </script>
+</body>
+</html>
