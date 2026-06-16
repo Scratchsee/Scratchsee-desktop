@@ -1,0 +1,35 @@
+{
+  "name": "scratchsee",
+  "version": "1.0.0",
+  "description": "Scratchsee Gelişmiş Analitik Laboratuvarı",
+  "main": "main.js",
+  "scripts": {
+    "build-all": "electron-builder --win"
+  },
+  "keywords": [],
+  "author": "Scratchsee Team",
+  "license": "ISC",
+  "build": {
+    "appId": "com.electron.scratchsee",
+    "productName": "Scratchsee",
+    "electronVersion": "30.5.1",
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "src/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "30.5.1",
+    "electron-builder": "24.13.3"
+  }
+}
